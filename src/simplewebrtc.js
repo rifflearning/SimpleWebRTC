@@ -232,14 +232,6 @@ function SimpleWebRTC(opts) {
         if (self.getLocalScreen()) {
             self.stopScreenShare();
         }
-        /*
-        self.connection.emit('unshareScreen');
-        self.webrtc.peers.forEach(function (peer) {
-            if (peer.sharemyscreen) {
-                peer.end();
-            }
-        });
-        */
     });
 
     this.webrtc.on('channelMessage', function (peer, label, data) {
@@ -423,10 +415,8 @@ SimpleWebRTC.prototype.stopScreenShare = function () {
         container.removeChild(videoEl);
     }
 
-    // a hack to emit the event the removes the video
-    // element that we want
     if (videoEl) {
-        this.emit('videoRemoved', videoEl);
+        this.emit('localScreenRemoved', videoEl);
     }
     if (this.getLocalScreen()) {
         this.webrtc.stopScreenShare();

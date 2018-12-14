@@ -75,6 +75,23 @@
                     showVolume(document.getElementById('volume_' + peer.id), data.volume);
                 }
             });
+            webrtc.on('localScreenAdded', function (video) {
+                console.log('screen added', video);
+                var remotes = document.getElementById('remotes');
+                if (remotes) {
+                    var d = document.createElement('div');
+                    d.className = 'videoContainer';
+                    d.id = 'container_sharing_' + webrtc.getDomId(video);
+                    d.appendChild(video);
+                    video.onclick = function () {
+                        video.style.width = video.videoWidth + 'px';
+                        video.style.height = video.videoHeight + 'px';
+                    };
+                    d.appendChild(video);
+                    remotes.appendChild(d);
+                    video.play()
+                }
+            });
             webrtc.on('videoAdded', function (video, peer) {
                 console.log('video added', peer);
                 var remotes = document.getElementById('remotes');
@@ -139,8 +156,14 @@
                 setButton = function (bool) {
                     button.text(bool ? 'share screen' : 'stop sharing');
                 };
-            webrtc.on('localScreenStopped', function () {
+            webrtc.on('localScreenRemoved', function (video) {
                 setButton(true);
+                var remotes = document.getElementById('remotes');
+                var el = document.getElementById('container_sharing_' + webrtc.getDomId(video));
+                if (remotes && el) {
+                    remotes.removeChild(el);
+                }
+
             });
 
             setButton(true);
