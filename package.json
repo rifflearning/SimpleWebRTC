@@ -10,7 +10,7 @@
   "dependencies": {
     "attachmediastream": "github:jordanreedie/attachMediaStream#master",
     "filetransfer": "^2.0.4",
-    "localmedia": "^5.0.0",
+    "localmedia": "github:jordanreedie/localmedia#feature/update-get-screen",
     "mockconsole": "0.0.1",
     "rtcpeerconnection": "^8.0.0",
     "socket.io-client": "^1.7.4",
