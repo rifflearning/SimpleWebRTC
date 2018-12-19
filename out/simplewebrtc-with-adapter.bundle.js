@@ -10651,9 +10651,26 @@ LocalMedia.prototype.stopStream = function (stream) {
     }
 };
 
-function isAvailableScreenShareSource() {
+function isScreenShareSourceAvailable() {
+    // currently we only support chrome v70+ (w/ experimental features enabled, if necessary)
+    // and firefox
     return (navigator.getDisplayMedia ||
             !!navigator.mediaDevices.getSupportedConstraints().mediaSource);
+}
+
+function getDisplayMedia() {
+    // should only be called after checking we have a source available
+    if (!isScreenShareSourceAvailable()) {
+        // TODO throw an error or something
+    }
+    if (navigator.getDisplayMedia) {
+        // chrome 70+
+        return navigator.getDisplayMedia({ video: true });
+    } else {
+        // firefox ? <= x <= 64
+        return navigator.mediaDevices.getUserMedia({ video: { mediaSource: 'screen' } });
+    }
+
 }
 
 LocalMedia.prototype.startScreenShare = function (constraints, cb) {
@@ -10661,26 +10678,17 @@ LocalMedia.prototype.startScreenShare = function (constraints, cb) {
 
     this.emit('localScreenRequested');
 
-    if (!isAvailableScreenShareSource()) {
+    if (!isScreenShareSourceAvailable()) {
         self.emit('localScreenRequestFailed');
         return;
     }
+
     // in the case that no constraints are passed,
     // but a callback is, swap
     if (typeof constraints === 'function' && !cb) {
         cb = constraints;
         constraints = null;
     }
-
-    var getDisplayMedia = function () {
-        if (navigator.getDisplayMedia) {
-            return navigator.getDisplayMedia({ video: true });
-        } else {
-            return navigator.mediaDevices.getUserMedia({ video: { mediaSource: 'screen' } });
-        }
-
-    };
-
 
     getDisplayMedia().then(function (stream) {
         self.localScreens.push(stream);
@@ -24419,18 +24427,18 @@ function SimpleWebRTC(opts) {
 
     // screensharing events
     this.webrtc.on('localScreen', function (stream) {
-        var item,
-            el = document.createElement('video'),
-            container = self.getRemoteVideoContainer();
+        var el = document.createElement('video');
+        var container = self.getRemoteVideoContainer();
 
         el.oncontextmenu = function () { return false; };
-        el.id = 'localScreen';
+        el.id = 'sharedScreen';
         attachMediaStream(stream, el);
         if (container) {
             container.appendChild(el);
         }
 
-        self.emit('localScreenAdded', el);
+        // emits the video element ready to be added to the DOM
+        self.emit('screenAdded', el);
         self.connection.emit('shareScreen');
 
         self.webrtc.peers.forEach(function (existingPeer) {
@@ -24452,7 +24460,7 @@ function SimpleWebRTC(opts) {
             }
         });
     });
-    this.webrtc.on('localScreenStopped', function (stream) {
+    this.webrtc.on('screenStopped', function (stream) {
         if (self.getLocalScreen()) {
             self.stopScreenShare();
         }
@@ -24632,7 +24640,7 @@ SimpleWebRTC.prototype.getLocalScreen = function () {
 
 SimpleWebRTC.prototype.stopScreenShare = function () {
     this.connection.emit('unshareScreen');
-    var videoEl = document.getElementById('localScreen');
+    var videoEl = document.getElementById('sharedScreen');
     var container = this.getRemoteVideoContainer();
 
     if (this.config.autoRemoveVideos && container && videoEl) {
@@ -24640,7 +24648,7 @@ SimpleWebRTC.prototype.stopScreenShare = function () {
     }
 
     if (videoEl) {
-        this.emit('localScreenRemoved', videoEl);
+        this.emit('screenRemoved', videoEl);
     }
     if (this.getLocalScreen()) {
         this.webrtc.stopScreenShare();
