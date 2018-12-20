@@ -18993,7 +18993,7 @@ function SimpleWebRTC(opts) {
         }
 
         // emits the video element ready to be added to the DOM
-        self.emit('screenAdded', el);
+        self.emit('localScreenAdded', el);
         self.connection.emit('shareScreen');
 
         self.webrtc.peers.forEach(function (existingPeer) {
@@ -19067,7 +19067,11 @@ SimpleWebRTC.prototype.handlePeerStreamAdded = function (peer) {
 
     if (container) container.appendChild(video);
 
-    this.emit('videoAdded', video, peer);
+    if (peer.type === 'video') {
+      this.emit('videoAdded', video, peer);
+    } else {
+      this.emit('screenAdded', video, peer);
+    }
 
     // send our mute status to new peer if we're muted
     // currently called with a small delay because it arrives before
@@ -19203,7 +19207,7 @@ SimpleWebRTC.prototype.stopScreenShare = function () {
     }
 
     if (videoEl) {
-        this.emit('screenRemoved', videoEl);
+        this.emit('localScreenRemoved', videoEl);
     }
     if (this.getLocalScreen()) {
         this.webrtc.stopScreenShare();
