@@ -24460,7 +24460,7 @@ function SimpleWebRTC(opts) {
             }
         });
     });
-    this.webrtc.on('screenStopped', function (stream) {
+    this.webrtc.on('localScreenStopped', function (stream) {
         if (self.getLocalScreen()) {
             self.stopScreenShare();
         }
@@ -24538,7 +24538,14 @@ SimpleWebRTC.prototype.handlePeerStreamRemoved = function (peer) {
     if (this.config.autoRemoveVideos && container && videoEl) {
         container.removeChild(videoEl);
     }
-    if (videoEl) this.emit('videoRemoved', videoEl, peer);
+
+    if (videoEl) {
+      if (peer.type === 'video' ) {
+        this.emit('videoRemoved', videoEl, peer);
+      } else {
+        this.emit('screenRemoved', videoEl, peer);
+      }
+    }
 };
 
 SimpleWebRTC.prototype.getDomId = function (peer) {

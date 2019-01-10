@@ -228,7 +228,7 @@ function SimpleWebRTC(opts) {
             }
         });
     });
-    this.webrtc.on('screenStopped', function (stream) {
+    this.webrtc.on('localScreenStopped', function (stream) {
         if (self.getLocalScreen()) {
             self.stopScreenShare();
         }
