@@ -204,6 +204,7 @@ function SimpleWebRTC(opts) {
         if (container) {
             container.appendChild(el);
         }
+        el.muted = true;
 
         // emits the video element ready to be added to the DOM
         self.emit('localScreenAdded', el);
@@ -379,6 +380,14 @@ SimpleWebRTC.prototype.startLocalVideo = function () {
             attachMediaStream(stream, self.getLocalVideoContainer(), self.config.localVideo);
         }
     });
+};
+
+SimpleWebRTC.prototype.reattachLocalVideo = function (videoEl) {
+    if (videoEl.srcObject == null && this.webrtc.localStreams.length === 1) {
+        attachMediaStream(this.webrtc.localStreams[0],
+                          videoEl,
+                          this.config.localVideo);
+    }
 };
 
 SimpleWebRTC.prototype.stopLocalVideo = function () {
