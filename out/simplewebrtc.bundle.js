@@ -5085,6 +5085,16 @@ function isAllTracksEnded(stream) {
     return isAllTracksEnded;
 }
 
+function isScreenShareSourceAvailable() {
+    // currently we only support chrome v70+ (w/ experimental features in versions <72)
+    // and firefox
+  return (
+    navigator.getDisplayMedia ||
+    navigator.mediaDevices.getDisplayMedia ||
+    Boolean(navigator.mediaDevices.getSupportedConstraints().mediaSource)
+  );
+}
+
 function shouldWorkAroundFirefoxStopStream() {
   if (typeof window === 'undefined') {
     return false;
@@ -5206,25 +5216,48 @@ LocalMedia.prototype.stopStream = function (stream) {
     }
 };
 
-function isScreenShareSourceAvailable() {
-    // currently we only support chrome v70+ (w/ experimental features enabled, if necessary)
-    // and firefox
-    return (navigator.getDisplayMedia ||
-            !!navigator.mediaDevices.getSupportedConstraints().mediaSource);
-}
 
-function getDisplayMedia() {
-    // should only be called after checking we have a source available
-    if (!isScreenShareSourceAvailable()) {
-        // TODO throw an error or something
-    }
-    if (navigator.getDisplayMedia) {
-        // chrome 70+
-        return navigator.getDisplayMedia({ video: true });
+function getDisplayMedia(constraints) {
+    let attachAudio = function(screenStream) {
+        return navigator.mediaDevices.getUserMedia({ video: false, audio: true }).then(function(audioStream) {
+            return new Promise(function(resolve, reject) {
+                try {
+                    var screenWithAudio = new MediaStream();
+                    screenWithAudio.addTrack(screenStream.getVideoTracks()[0]);
+                    screenWithAudio.addTrack(audioStream.getAudioTracks()[0]);
+                    resolve(screenWithAudio);
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        });
+    };
+
+    let displayMedia;
+    let needAttach = false;
+
+    // this is a little gross because chrome doesn't support requesting audio but firefox does
+    if (navigator.mediaDevices.getDisplayMedia) {
+        // chrome 72+
+        displayMedia = navigator.mediaDevices.getDisplayMedia({ video: true });
+        needAttach = true;
+    } else if (navigator.getDisplayMedia) {
+        // chrome 70 & 71 (exp. features enabled)
+        displayMedia = navigator.getDisplayMedia({ video: true }).then();
+        needAttach = true;
     } else {
         // firefox ? <= x <= 64
-        return navigator.mediaDevices.getUserMedia({ video: { mediaSource: 'screen' } });
+        displayMedia = navigator.mediaDevices.getUserMedia({
+          audio: constraints && constraints.audio,
+          video: { mediaSource: 'screen' }
+        });
     }
+
+  if (constraints && constraints.audio && needAttach) {
+      return displayMedia.then(attachAudio);
+  } else {
+      return displayMedia;
+  }
 
 }
 
@@ -5238,6 +5271,7 @@ LocalMedia.prototype.startScreenShare = function (constraints, cb) {
         return;
     }
 
+
     // in the case that no constraints are passed,
     // but a callback is, swap
     if (typeof constraints === 'function' && !cb) {
@@ -5245,19 +5279,21 @@ LocalMedia.prototype.startScreenShare = function (constraints, cb) {
         constraints = null;
     }
 
-    getDisplayMedia().then(function (stream) {
+    constraints = constraints || { video: true, audio: true};
+
+    getDisplayMedia(constraints).then(function (stream) {
         self.localScreens.push(stream);
 
-        stream.getTracks().forEach(function (track) {
-            track.addEventListener('ended', function () {
-                var isAllTracksEnded = true;
-                stream.getTracks().forEach(function (t) {
-                    isAllTracksEnded = t.readyState === 'ended' && isAllTracksEnded;
-                });
+        // if the user was muted before sharing,
+        // they should not be unmuted when sharing
+        if (!self.isAudioEnabled()) {
+          self.mute();
+        }
 
-                if (isAllTracksEnded) {
-                    self._removeStream(stream);
-                }
+        // we only care about video track ending for screen sharing
+        stream.getVideoTracks().forEach(function (track) {
+            track.addEventListener('ended', function () {
+                self._removeStream(stream);
             });
         });
 
@@ -5328,6 +5364,11 @@ LocalMedia.prototype._audioEnabled = function (bool) {
             track.enabled = !!bool;
         });
     });
+    this.localScreens.forEach(function (stream) {
+        stream.getAudioTracks().forEach(function (track) {
+            track.enabled = !!bool;
+        });
+    });
 };
 LocalMedia.prototype._videoEnabled = function (bool) {
     this.localStreams.forEach(function (stream) {
@@ -5341,6 +5382,11 @@ LocalMedia.prototype._videoEnabled = function (bool) {
 LocalMedia.prototype.isAudioEnabled = function () {
     var enabled = true;
     this.localStreams.forEach(function (stream) {
+        stream.getAudioTracks().forEach(function (track) {
+            enabled = enabled && track.enabled;
+        });
+    });
+    this.localScreens.forEach(function (stream) {
         stream.getAudioTracks().forEach(function (track) {
             enabled = enabled && track.enabled;
         });
@@ -5412,7 +5458,6 @@ LocalMedia.prototype._stopAudioMonitor = function (stream) {
         this._audioMonitors.splice(idx, 1);
     }
 };
-
 module.exports = LocalMedia;
 
 },{"hark":26,"mockconsole":35,"util":63,"wildemitter":77}],34:[function(require,module,exports){
@@ -11017,6 +11062,9 @@ exports.toMediaJSON = function (media, session, opts) {
         if (parsers.findLine('a=rtcp-mux', lines)) {
             desc.mux = true;
         }
+        if (parsers.findLine('a=rtcp-rsize', lines)) {
+            desc.rsize = true;
+        }
 
         var fbLines = parsers.findLines('a=rtcp-fb:*', lines);
         fbLines.forEach(function (line) {
@@ -11237,6 +11285,9 @@ exports.toMediaSDP = function (content, opts) {
 
     if (desc.mux) {
         sdp.push('a=rtcp-mux');
+    }
+    if (desc.rsize) {
+        sdp.push('a=rtcp-rsize');
     }
 
     var encryption = desc.encryption || [];
@@ -18991,6 +19042,7 @@ function SimpleWebRTC(opts) {
         if (container) {
             container.appendChild(el);
         }
+        el.muted = true;
 
         // emits the video element ready to be added to the DOM
         self.emit('localScreenAdded', el);
@@ -19166,6 +19218,14 @@ SimpleWebRTC.prototype.startLocalVideo = function () {
             attachMediaStream(stream, self.getLocalVideoContainer(), self.config.localVideo);
         }
     });
+};
+
+SimpleWebRTC.prototype.reattachLocalVideo = function (videoEl) {
+    if (videoEl.srcObject == null && this.webrtc.localStreams.length === 1) {
+        attachMediaStream(this.webrtc.localStreams[0],
+                          videoEl,
+                          this.config.localVideo);
+    }
 };
 
 SimpleWebRTC.prototype.stopLocalVideo = function () {
