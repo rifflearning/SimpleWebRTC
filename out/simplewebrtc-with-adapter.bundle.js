@@ -24216,7 +24216,7 @@ Peer.prototype.onIceCandidate = function (candidate) {
             this.send('candidate', candidate);
         }
     } else {
-        this.logger.log("End of candidates.");
+        this.logger.log('End of candidates.');
     }
 };
 
@@ -24245,10 +24245,10 @@ Peer.prototype.icerestart = function () {
 Peer.prototype.setVideoBitrateLimit = function(bitrateLimit) {
     // NOTE - this only sets the *outgoing* bitrate limit
     // the incoming bitrate limit is determined by the peer
-    // bitrateLimit is in kilobits per second
+    // bitrateLimit is in kilobits per second (or the string 'unlimited')
 
     // don't limit bandwidth for screen sharing
-    if (this.type === "screen") {
+    if (this.type === 'screen') {
         return;
     }
 
@@ -24260,7 +24260,7 @@ Peer.prototype.setVideoBitrateLimit = function(bitrateLimit) {
     var sender;
     // the order of the returned array is random according to the spec,
     // so we have to determine which has the video track
-    if (senders[0].track.kind === "video") {
+    if (senders[0].track.kind === 'video') {
         sender = senders[0];
     } else {
         sender = senders[1];
@@ -24280,9 +24280,9 @@ Peer.prototype.setVideoBitrateLimit = function(bitrateLimit) {
     }
 
     sender.setParameters(parameters).then(function () {
-        console.log("bitrate set succeeded");
+        this.logger.log(`set bitrate to ${bitrateLimit} succeeded`);
     }).catch(function (err) {
-        console.log(err);
+        this.logger.log(err);
     });
 };
 
@@ -24340,7 +24340,7 @@ Peer.prototype.sendFile = function (file) {
     };
     // override onclose
     dc.onclose = function () {
-        console.log('sender received transfer');
+        this.logger.log('sender received transfer');
         sender.emit('complete');
     };
     return sender;
