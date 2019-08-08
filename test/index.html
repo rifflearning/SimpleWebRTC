@@ -31,6 +31,10 @@
             <input id="sessionInput"/>
             <button type="submit">Create it!</button>
         </form>
+        <form id="setBandwidth">
+            <input id="bandwidthLimit"/>
+            <button type="submit">Limit it!</button>
+        </form>
         <div class="videoContainer">
             <video id="localVideo" style="height: 150px;" oncontextmenu="return false;"></video>
             <div id="localVolume" class="volume_bar"></div>
@@ -50,14 +54,19 @@
                 remoteVideosEl: '',
                 // immediately ask for camera access
                 autoRequestMedia: true,
-                debug: false,
-                detectSpeakingEvents: true
+                videoBandwidthLimit: 1400,
+                debug: true,
+                detectSpeakingEvents: false
             });
 
+            var inRoom = false;
             // when it's ready, join if we got a room from the URL
             webrtc.on('readyToCall', function () {
                 // you can name it anything
-                if (room) webrtc.joinRoom(room);
+                if (room && !inRoom) {
+                    inRoom = true;
+                    webrtc.joinRoom(room);
+                }
             });
 
             function showVolume(el, volume) {
@@ -126,7 +135,7 @@
 
             // Since we use this twice we put it here
             function setRoom(name) {
-                $('form').remove();
+                $('#createRoom').remove();
                 $('h1').text(name);
                 $('#subTitle').text('Link to join: ' + location.href);
                 $('body').addClass('active');
@@ -135,7 +144,7 @@
             if (room) {
                 setRoom(room);
             } else {
-                $('form').submit(function () {
+                $('#createRoom').submit(function () {
                     var val = $('#sessionInput').val().toLowerCase().replace(/\s/g, '-').replace(/[^A-Za-z0-9_\-]/g, '');
                     webrtc.createRoom(val, function (err, name) {
                         console.log(' create room cb', arguments);
@@ -167,6 +176,11 @@
             });
 
             setButton(true);
+            $('#setBandwidth').submit(function () {
+                var val = parseInt($('#bandwidthLimit').val().toLowerCase().replace(/\s/g, '-').replace(/[^A-Za-z0-9_\-]/g, ''));
+                webrtc.setVideoBandwidthLimit(val);
+                return false;
+            });
 
             button.click(function () {
                 if (webrtc.getLocalScreen()) {
@@ -183,6 +197,7 @@
 
                 }
             });
+
         </script>
     </body>
 </html>
