@@ -291,7 +291,7 @@ Peer.prototype.setVideoBitrateLimit = function(bitrateLimit) {
         parameters.encodings[0].maxBitrate = bitrateLimit * 1000;
     }
 
-    sender.setParameters(parameters).then(function () {
+    sender.setParameters(parameters).then(() => {
         this.logger.log(`set bitrate to ${bitrateLimit} succeeded`);
     }).catch(function (err) {
         this.logger.log(err);
@@ -351,7 +351,7 @@ Peer.prototype.sendFile = function (file) {
         sender.send(file, dc);
     };
     // override onclose
-    dc.onclose = function () {
+    dc.onclose = () => {
         this.logger.log('sender received transfer');
         sender.emit('complete');
     };
