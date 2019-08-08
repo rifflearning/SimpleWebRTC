@@ -3,6 +3,12 @@ var webrtcSupport = require('webrtcsupport');
 var PeerConnection = require('rtcpeerconnection');
 var WildEmitter = require('wildemitter');
 var FileTransfer = require('filetransfer');
+// sdputils is required for the sdp modification
+// it is found here: https://github.com/webrtc/apprtc/blob/master/src/web_app/js/sdputils.js
+// I have temporarily removed it from this repo because we're not actively using it
+// at the moment and I didn't want to have to deal with the licensing stuff
+// -jr 8.6.19
+// var sdputils = require('./sdputils');
 
 // the inband-v1 protocol is sending metadata inband in a serialized JSON object
 // followed by the actual data. Receiver closes the datachannel upon completion
@@ -31,6 +37,14 @@ function Peer(options) {
     this.stream = options.stream;
     this.enableDataChannels = options.enableDataChannels === undefined ? this.parent.config.enableDataChannels : options.enableDataChannels;
     this.receiveMedia = options.receiveMedia || this.parent.config.receiveMedia;
+    // this streamConfig is for limiting bitrate via SDP modification,
+    // which we are not currently using
+    // we may want to use it in the future, however,
+    // so i'm leaving it in place
+    this.streamConfig = {
+        videoRecvBitrate: options.videoBitrateLimit,
+        audioRecvBitrate: options.audioBitrateLimit
+    };
     this.channels = {};
     this.sid = options.sid || Date.now().toString();
     // Create an RTCPeerConnection via the polyfill
@@ -41,10 +55,18 @@ function Peer(options) {
     });
     this.pc.on('offer', function (offer) {
         if (self.parent.config.nick) offer.nick = self.parent.config.nick;
+        // NOTE - this is to limit bitrate via SDP
+        // we've disabled this for now, since we're using setParameters.
+        // however we may want it in the future for broader device / browser support
+        // offer.sdp = sdputils.maybeSetAudioReceiveBitRate(offer.sdp, self.streamConfig);
+        // offer.sdp = sdputils.maybeSetVideoReceiveBitRate(offer.sdp, self.streamConfig);
         self.send('offer', offer);
     });
     this.pc.on('answer', function (answer) {
         if (self.parent.config.nick) answer.nick = self.parent.config.nick;
+        // NOTE - this is to limit bitrate via SDP
+        // answer.sdp = sdputils.maybeSetAudioReceiveBitRate(answer.sdp, self.streamConfig);
+        // answer.sdp = sdputils.maybeSetVideoReceiveBitRate(answer.sdp, self.streamConfig);
         self.send('answer', answer);
     });
     this.pc.on('addStream', this.handleRemoteStreamAdded.bind(this));
@@ -230,6 +252,50 @@ Peer.prototype.icerestart = function () {
     var constraints = this.receiveMedia;
     constraints.mandatory.IceRestart = true;
     this.pc.offer(constraints, function (err, success) { });
+};
+
+Peer.prototype.setVideoBitrateLimit = function(bitrateLimit) {
+    // NOTE - this only sets the *outgoing* bitrate limit
+    // the incoming bitrate limit is determined by the peer
+    // bitrateLimit is in kilobits per second
+
+    // don't limit bandwidth for screen sharing
+    if (this.type === "screen") {
+        return;
+    }
+
+    // NOTE - this only works on chrome and (firefox >= 64)
+    // use this.pc.pc to get the underlying RTCPeerConnection object
+    // from the PeerConnection wrapper
+    // this is kind of a hack
+    var senders = this.pc.pc.getSenders();
+    var sender;
+    // the order of the returned array is random according to the spec,
+    // so we have to determine which has the video track
+    if (senders[0].track.kind === "video") {
+        sender = senders[0];
+    } else {
+        sender = senders[1];
+    }
+
+    var parameters = sender.getParameters();
+    // parameters.encodings is sometimes undefined
+    if (!parameters.encodings || !parameters.encodings[0]) {
+        parameters.encodings = [{}];
+    }
+
+    if (bitrateLimit === 'unlimited') {
+        delete parameters.encodings[0].maxBitrate;
+    } else {
+        // maxBitrate is measured in bits
+        parameters.encodings[0].maxBitrate = bitrateLimit * 1000;
+    }
+
+    sender.setParameters(parameters).then(function () {
+        console.log("bitrate set succeeded");
+    }).catch(function (err) {
+        console.log(err);
+    });
 };
 
 Peer.prototype.end = function () {

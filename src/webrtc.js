@@ -153,4 +153,12 @@ WebRTC.prototype.sendDirectlyToAll = function (channel, message, payload) {
     });
 };
 
+WebRTC.prototype.setVideoBitrateLimit = function (bitrateLimit) {
+    // the sets the outgoing bitrate for each connection the client has made
+    // (excluding shared screens)
+    this.peers.forEach(function (peer) {
+        peer.setVideoBitrateLimit(bitrateLimit);
+    });
+};
+
 module.exports = WebRTC;

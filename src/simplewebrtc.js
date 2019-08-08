@@ -20,6 +20,7 @@ function SimpleWebRTC(opts) {
             autoRemoveVideos: true,
             adjustPeerVolume: false,
             peerVolumeWhenSpeaking: 0.25,
+            videoBitrateLimit: null,
             media: {
                 video: true,
                 audio: true
@@ -96,6 +97,7 @@ function SimpleWebRTC(opts) {
                     sid: message.sid,
                     type: message.roomType,
                     enableDataChannels: self.config.enableDataChannels && message.roomType !== 'screen',
+                    videoBitrateLimit: self.config.videoBitrateLimit,
                     sharemyscreen: message.roomType === 'screen' && !message.broadcaster,
                     broadcaster: message.roomType === 'screen' && !message.broadcaster ? self.connection.getSessionid() : null
                 });
@@ -346,6 +348,7 @@ SimpleWebRTC.prototype.joinRoom = function (name, cb) {
                             id: id,
                             type: type,
                             enableDataChannels: self.config.enableDataChannels && type !== 'screen',
+                            videoBitrateLimit: self.config.videoBitrateLimit,
                             receiveMedia: {
                                 offerToReceiveAudio: type !== 'screen' && self.config.receiveMedia.offerToReceiveAudio ? 1 : 0,
                                 offerToReceiveVideo: self.config.receiveMedia.offerToReceiveVideo
@@ -471,6 +474,13 @@ SimpleWebRTC.prototype.sendFile = function () {
         return this.emit('error', new Error('DataChannelNotSupported'));
     }
 
+};
+
+SimpleWebRTC.prototype.setVideoBitrateLimit = function (bitrateLimit) {
+    // this config is not used currently, but left in place for SDP modification
+    // should we decide to use it in the future
+    this.config.videoBitrateLimit = bitrateLimit;
+    this.webrtc.setVideoBitrateLimit(bitrateLimit);
 };
 
 module.exports = SimpleWebRTC;
