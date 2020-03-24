@@ -236,8 +236,12 @@ function SimpleWebRTC(opts) {
     });
 
     this.webrtc.on('channelMessage', function (peer, label, data) {
-        if (data.type == 'volume') {
+        if (data.type === 'volume') {
             self.emit('remoteVolumeChange', peer, data.volume);
+        } else if (data.type === 'urlShareStart') {
+            self.emit('urlShareStart', peer, data.payload);
+        } else if (data.type === 'urlShareStop') {
+            self.emit('urlShareStop', peer, data.payload);
         }
     });
 
