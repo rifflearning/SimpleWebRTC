@@ -22,6 +22,65 @@ function isAllTracksEnded(stream) {
     return isAllTracksEnded;
 }
 
+// takes an mLine, modifies it to put the given
+// codec ID at the front of the list
+function setDefaultCodec(mLine, id) {
+    // m line example format:
+    // m=video 60372 UDP/TLS/RTP/SAVPF 100 101 116 117 96
+    let elements = mLine.split(' ');
+    let newLine = [];
+    let index = 0;
+    for (var i = 0; i < elements.length; i++) {
+        if (index === 3) {
+            newLine[index++] = id;
+        }
+        if (elements[i] !== id) {
+            newLine[index++] = elements[i];
+        }
+    }
+    return newLine.join(' ');
+}
+
+/**
+ * take an SDP and modify it to prefer
+ * the given encoding
+ * must match string expected in SDP
+ */
+function preferCodec(sdp, codec) {
+    const sdpLines = sdp.split('\r\n');
+    // find this so we can modify it later
+    let mLineIndex = null;
+    // it's possible to have more than one ID for
+    // a single codec, but i'm not sure why
+    // keeping track of all of them, even if we only
+    // use the first one for now
+    let codexLineIndices = [];
+    for (var i = 0; i < sdpLines.length; i++) {
+        if (sdpLines[i].search('m=video') !== -1) {
+            mLineIndex = i;
+        }
+        if (sdpLines[i].search(codec) !== -1) {
+            codexLineIndices.push(i);
+        }
+    }
+
+    let codexLineIds = [];
+    // example codex line format:
+    // a=rtpmap:126 H264/90000
+    // we want the `126` portion of it
+    for (let i = 0; i < codexLineIndices.length; i++) {
+        const codexLine = sdpLines[codexLineIndices[i]];
+        // grab the slice starting after the `:` and before the ` `
+        const sliceStart = codexLine.indexOf(':') + 1;
+        const sliceEnd = codexLine.indexOf(' ');
+        codexLineIds.push(codexLine.slice(sliceStart, sliceEnd));
+    }
+
+    const mLine = sdpLines[mLineIndex];
+    sdpLines[mLineIndex] = setDefaultCodec(mLine, codexLineIds[0]);
+    return sdpLines.join('\r\n');
+}
+
 function Peer(options) {
     var self = this;
 
@@ -47,6 +106,7 @@ function Peer(options) {
     };
     this.channels = {};
     this.sid = options.sid || Date.now().toString();
+    this.codec = options.codec || "";
     // Create an RTCPeerConnection via the polyfill
     this.pc = new PeerConnection(this.parent.config.peerConnectionConfig, this.parent.config.peerConnectionConstraints);
     this.pc.on('ice', this.onIceCandidate.bind(this));
@@ -60,6 +120,11 @@ function Peer(options) {
         // however we may want it in the future for broader device / browser support
         // offer.sdp = sdputils.maybeSetAudioReceiveBitRate(offer.sdp, self.streamConfig);
         // offer.sdp = sdputils.maybeSetVideoReceiveBitRate(offer.sdp, self.streamConfig);
+        if (self.codec) {
+            const sdp = offer.sdp;
+            const modifiedSdp = preferCodec(sdp, self.codec);
+            offer.sdp = modifiedSdp;
+        }
         self.send('offer', offer);
     });
     this.pc.on('answer', function (answer) {
