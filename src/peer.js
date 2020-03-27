@@ -34,11 +34,47 @@ function setDefaultCodec(mLine, id) {
         if (index === 3) {
             newLine[index++] = id;
         }
-        if (elements[i] !== id) {
+        if (elements[i] !== id || index < 3) {
             newLine[index++] = elements[i];
         }
     }
     return newLine.join(' ');
+}
+
+/** adds b=as <bitrate> to the sdp */
+function setBitrate(sdp, mediaType, bitrate) {
+    const sdpLines = sdp.split('\r\n');
+    let mLineIndex = null;
+    // find the m line matching our mediatype, so we can make sure
+    // we're modifying the correct section
+    for (var i = 0; i < sdpLines.length; i++) {
+        if (sdpLines[i].search('m=' + mediaType) !== -1) {
+            mLineIndex = i;
+            break;
+        }
+    }
+
+    let index = mLineIndex + 1;
+    // we need to find the correct spot to insert the b= line.
+    // per RFC 4566 (https://tools.ietf.org/html/rfc4566),
+    // b= line must follow c= line (if it exists)
+    // c= line (if it exists) follows i= line (if it exists),
+    // i= line (if it exists) follows m= line
+    // ex:
+    // m=mediaType etc
+    // i=etc (optional)
+    // c=etc (optional)
+    // b=etc
+    while (sdpLines[index].startsWith('i=') || sdpLines[index].startsWith('c=')) {
+        index++;
+    }
+
+    if (sdpLines[index].startsWith('b=AS')) {
+        // bitrate limit already specified
+        return sdp;
+    }
+    sdpLines.splice(index, 0, 'b=AS:' + bitrate);
+    return sdpLines.join('\r\n');
 }
 
 /**
@@ -46,7 +82,7 @@ function setDefaultCodec(mLine, id) {
  * the given encoding
  * must match string expected in SDP
  */
-function preferCodec(sdp, codec) {
+function preferCodec(sdp, mediaType, codec) {
     const sdpLines = sdp.split('\r\n');
     // find this so we can modify it later
     let mLineIndex = null;
@@ -56,7 +92,7 @@ function preferCodec(sdp, codec) {
     // use the first one for now
     let codexLineIndices = [];
     for (var i = 0; i < sdpLines.length; i++) {
-        if (sdpLines[i].search('m=video') !== -1) {
+        if (sdpLines[i].search('m=' + mediaType) !== -1) {
             mLineIndex = i;
         }
         if (sdpLines[i].search(codec) !== -1) {
@@ -106,7 +142,10 @@ function Peer(options) {
     };
     this.channels = {};
     this.sid = options.sid || Date.now().toString();
-    this.codec = options.codec || "";
+    this.audioCodec = options.audioCodec || "";
+    this.videoCodec = options.videoCodec || "";
+    this.audioSDPBitrate = options.audioSDPBitrate || "";
+    this.videoSDPBitrate = options.videoSDPBitrate || "";
     // Create an RTCPeerConnection via the polyfill
     this.pc = new PeerConnection(this.parent.config.peerConnectionConfig, this.parent.config.peerConnectionConstraints);
     this.pc.on('ice', this.onIceCandidate.bind(this));
@@ -120,11 +159,22 @@ function Peer(options) {
         // however we may want it in the future for broader device / browser support
         // offer.sdp = sdputils.maybeSetAudioReceiveBitRate(offer.sdp, self.streamConfig);
         // offer.sdp = sdputils.maybeSetVideoReceiveBitRate(offer.sdp, self.streamConfig);
-        if (self.codec) {
-            const sdp = offer.sdp;
-            const modifiedSdp = preferCodec(sdp, self.codec);
-            offer.sdp = modifiedSdp;
+        let sdp = offer.sdp;
+        if (self.videoCodec) {
+            sdp = preferCodec(sdp, 'video', self.videoCodec);
         }
+        if (self.audioCodec) {
+            sdp = preferCodec(sdp, 'audio', self.audioCodec);
+        }
+
+        if (self.videoSDPBitrate) {
+            sdp = setBitrate(sdp, 'video', '1024');
+        }
+        if (self.audioSDPBitrate) {
+            sdp = setBitrate(sdp, 'video', '1024');
+        }
+        offer.sdp = sdp;
+        console.log('offer sdp: ', offer.sdp);
         self.send('offer', offer);
     });
     this.pc.on('answer', function (answer) {
@@ -132,6 +182,23 @@ function Peer(options) {
         // NOTE - this is to limit bitrate via SDP
         // answer.sdp = sdputils.maybeSetAudioReceiveBitRate(answer.sdp, self.streamConfig);
         // answer.sdp = sdputils.maybeSetVideoReceiveBitRate(answer.sdp, self.streamConfig);
+        let sdp = answer.sdp;
+        if (self.videoCodec) {
+            sdp = preferCodec(sdp, 'video', self.videoCodec);
+        }
+        if (self.audioCodec) {
+            sdp = preferCodec(sdp, 'audio', self.audioCodec);
+        }
+
+        if (self.videoSDPBitrate) {
+            sdp = setBitrate(sdp, 'video', self.videoSDPBitrate);
+        }
+        if (self.audioSDPBitrate) {
+            sdp = setBitrate(sdp, 'video', self.videoSDPBitrate);
+        }
+
+        answer.sdp = sdp;
+        console.log('answer sdp: ', answer.sdp);
         self.send('answer', answer);
     });
     this.pc.on('addStream', this.handleRemoteStreamAdded.bind(this));
