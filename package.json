@@ -42,9 +42,9 @@
     "webrtc-adapter": "^6.4.8"
   },
   "dependencies": {
-    "attachmediastream": "github:rifflearning/attachMediaStream#889613872dae1a46eacade0f07e5e0c8b637e848",
+    "@rifflearning/attachmediastream": "^3.0.0",
+    "@rifflearning/localmedia": "^6.0.0",
     "filetransfer": "^2.0.4",
-    "localmedia": "github:rifflearning/localmedia#62adc5be5e1bbaac5fa7b2e8ebfaf0a6bacffa2f",
     "mockconsole": "0.0.1",
     "rtcpeerconnection": "^8.0.0",
     "socket.io-client": "^1.7.4",

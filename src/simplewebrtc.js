@@ -1,7 +1,7 @@
 var WebRTC = require('./webrtc');
 var WildEmitter = require('wildemitter');
 var webrtcSupport = require('webrtcsupport');
-var attachMediaStream = require('attachmediastream');
+var attachMediaStream = require('@rifflearning/attachmediastream');
 var mockconsole = require('mockconsole');
 var SocketIoConnection = require('./socketioconnection');
 
