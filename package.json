@@ -47,7 +47,7 @@
     "filetransfer": "^2.0.4",
     "mockconsole": "0.0.1",
     "rtcpeerconnection": "^8.0.0",
-    "socket.io-client": "^1.7.4",
+    "socket.io-client": "^2.3.0",
     "webrtcsupport": "^2.2.0",
     "wildemitter": "^1.2.1"
   },
