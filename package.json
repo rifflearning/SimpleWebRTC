@@ -16,7 +16,7 @@
   },
   "upstream": {
     "type": "git",
-	"url": "https://github.com/simplewebrtc/SimpleWebRTC.git"
+    "url": "https://github.com/simplewebrtc/SimpleWebRTC.git"
   },
   "bugs": {
     "url": "https://github.com/rifflearning/SimpleWebRTC/issues"
@@ -39,7 +39,7 @@
     "validate"
   ],
   "peerDependencies": {
-    "webrtc-adapter": "^6.0.0"
+    "webrtc-adapter": "^6.4.8"
   },
   "dependencies": {
     "attachmediastream": "github:rifflearning/attachMediaStream#889613872dae1a46eacade0f07e5e0c8b637e848",
@@ -52,13 +52,13 @@
     "wildemitter": "^1.2.1"
   },
   "devDependencies": {
-    "browserify": "^16.4.0",
+    "browserify": "^16.5.1",
     "precommit-hook": "^3.0.0",
     "stupid-server": "^0.2.2",
-    "tape": "^4.11.0",
-    "testling": "^1.7.1",
-    "travis-multirunner": "^4.0.0",
-    "webrtc-adapter": "^6.0.0",
+    "tape": "^4.13.2",
+    "testling": "^1.7.3",
+    "travis-multirunner": "^4.6.0",
+    "webrtc-adapter": "^6.4.8",
     "webrtc-testbed": "git+https://github.com/fippo/testbed.git"
   }
 }
