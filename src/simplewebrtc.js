@@ -98,6 +98,10 @@ function SimpleWebRTC(opts) {
                     type: message.roomType,
                     enableDataChannels: self.config.enableDataChannels && message.roomType !== 'screen',
                     videoBitrateLimit: self.config.videoBitrateLimit,
+                    videoCodec: self.config.videoCodec,
+                    audioCodec: self.config.audioCodec,
+                    videoSDPBitrate: self.config.videoSDPBitrate,
+                    audioSDPBitrate: self.config.audioSDPBitrate,
                     sharemyscreen: message.roomType === 'screen' && !message.broadcaster,
                     broadcaster: message.roomType === 'screen' && !message.broadcaster ? self.connection.getSessionid() : null
                 });
@@ -220,6 +224,7 @@ function SimpleWebRTC(opts) {
                     type: 'screen',
                     sharemyscreen: true,
                     enableDataChannels: false,
+                    videoCodec: self.config.videoCodec,
                     receiveMedia: {
                         offerToReceiveAudio: 0,
                         offerToReceiveVideo: 0
@@ -353,6 +358,10 @@ SimpleWebRTC.prototype.joinRoom = function (name, cb) {
                             type: type,
                             enableDataChannels: self.config.enableDataChannels && type !== 'screen',
                             videoBitrateLimit: self.config.videoBitrateLimit,
+                            videoCodec: self.config.videoCodec,
+                            audioCodec: self.config.audioCodec,
+                            videoSDPBitrate: self.config.videoSDPBitrate,
+                            audioSDPBitrate: self.config.audioSDPBitrate,
                             receiveMedia: {
                                 offerToReceiveAudio: type !== 'screen' && self.config.receiveMedia.offerToReceiveAudio ? 1 : 0,
                                 offerToReceiveVideo: self.config.receiveMedia.offerToReceiveVideo

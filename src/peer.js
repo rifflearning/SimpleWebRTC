@@ -15,11 +15,112 @@ var FileTransfer = require('filetransfer');
 var INBAND_FILETRANSFER_V1 = 'https://simplewebrtc.com/protocol/filetransfer#inband-v1';
 
 function isAllTracksEnded(stream) {
-    var isAllTracksEnded = true;
+    let isAllTracksEnded = true;
     stream.getTracks().forEach(function (t) {
         isAllTracksEnded = t.readyState === 'ended' && isAllTracksEnded;
     });
     return isAllTracksEnded;
+}
+
+// takes an mLine, modifies it to put the given
+// codec ID at the front of the list
+function setDefaultCodec(mLine, id) {
+    // m line example format:
+    // m=video 60372 UDP/TLS/RTP/SAVPF 100 101 116 117 96
+    let elements = mLine.split(' ');
+    let newLine = [];
+    let index = 0;
+    for (let i = 0; i < elements.length; i++) {
+        if (index === 3) {
+            newLine[index++] = id;
+        }
+        if (elements[i] !== id || index < 3) {
+            newLine[index++] = elements[i];
+        }
+    }
+    return newLine.join(' ');
+}
+
+/** adds b=as <bitrate> to the sdp */
+function setBitrate(sdp, mediaType, bitrate) {
+    const sdpLines = sdp.split('\r\n');
+    let mLineIndex = null;
+    // find the m line matching our mediatype, so we can make sure
+    // we're modifying the correct section
+    for (let i = 0; i < sdpLines.length; i++) {
+        if (sdpLines[i].search('m=' + mediaType) !== -1) {
+            mLineIndex = i;
+            break;
+        }
+    }
+
+    if (mLineIndex === null) {
+        // if there's no m line, we've been given a broken SDP
+        // just abort and send it back
+        return sdp;
+    }
+
+    let index = mLineIndex + 1;
+    // we need to find the correct spot to insert the b= line.
+    // per RFC 4566 (https://tools.ietf.org/html/rfc4566),
+    // b= line must follow c= line (if it exists)
+    // c= line (if it exists) follows i= line (if it exists),
+    // i= line (if it exists) follows m= line
+    // ex:
+    // m=mediaType etc
+    // i=etc (optional)
+    // c=etc (optional)
+    // b=etc
+    while (sdpLines[index].startsWith('i=') || sdpLines[index].startsWith('c=')) {
+        index++;
+    }
+
+    if (sdpLines[index].startsWith('b=AS')) {
+        // bitrate limit already specified
+        return sdp;
+    }
+    sdpLines.splice(index, 0, 'b=AS:' + bitrate);
+    return sdpLines.join('\r\n');
+}
+
+/**
+ * take an SDP and modify it to prefer
+ * the given encoding
+ * must match string expected in SDP
+ */
+function preferCodec(sdp, mediaType, codec) {
+    const sdpLines = sdp.split('\r\n');
+    // find this so we can modify it later
+    let mLineIndex = null;
+    // it's possible to have more than one ID for
+    // a single codec, but i'm not sure why
+    // keeping track of all of them, even if we only
+    // use the first one for now
+    let codexLineIndices = [];
+    for (let i = 0; i < sdpLines.length; i++) {
+        if (sdpLines[i].search('m=' + mediaType) !== -1) {
+            mLineIndex = i;
+        }
+        if (sdpLines[i].search(codec) !== -1) {
+            codexLineIndices.push(i);
+        }
+    }
+
+    let codexLineIds = [];
+    // example codex line format:
+    // a=rtpmap:126 H264/90000
+    // we want the `126` portion of it
+    for (let i = 0; i < codexLineIndices.length; i++) {
+        const codexLine = sdpLines[codexLineIndices[i]];
+        // grab the slice starting after the `:` and before the ` `
+        const sliceStart = codexLine.indexOf(':') + 1;
+        const sliceEnd = codexLine.indexOf(' ');
+        codexLineIds.push(codexLine.slice(sliceStart, sliceEnd));
+    }
+
+    const mLine = sdpLines[mLineIndex];
+    sdpLines[mLineIndex] = setDefaultCodec(mLine, codexLineIds[0]);
+    return sdpLines.join('\r\n');
 }
 
 function Peer(options) {
@@ -47,6 +148,10 @@ function Peer(options) {
     };
     this.channels = {};
     this.sid = options.sid || Date.now().toString();
+    this.audioCodec = options.audioCodec || "";
+    this.videoCodec = options.videoCodec || "";
+    this.audioSDPBitrate = options.audioSDPBitrate || "";
+    this.videoSDPBitrate = options.videoSDPBitrate || "";
     // Create an RTCPeerConnection via the polyfill
     this.pc = new PeerConnection(this.parent.config.peerConnectionConfig, this.parent.config.peerConnectionConstraints);
     this.pc.on('ice', this.onIceCandidate.bind(this));
@@ -60,6 +165,21 @@ function Peer(options) {
         // however we may want it in the future for broader device / browser support
         // offer.sdp = sdputils.maybeSetAudioReceiveBitRate(offer.sdp, self.streamConfig);
         // offer.sdp = sdputils.maybeSetVideoReceiveBitRate(offer.sdp, self.streamConfig);
+        let sdp = offer.sdp;
+        if (self.videoCodec) {
+            sdp = preferCodec(sdp, 'video', self.videoCodec);
+        }
+        if (self.audioCodec) {
+            sdp = preferCodec(sdp, 'audio', self.audioCodec);
+        }
+
+        if (self.videoSDPBitrate) {
+            sdp = setBitrate(sdp, 'video', '1024');
+        }
+        if (self.audioSDPBitrate) {
+            sdp = setBitrate(sdp, 'video', '1024');
+        }
+        offer.sdp = sdp;
         self.send('offer', offer);
     });
     this.pc.on('answer', function (answer) {
@@ -67,6 +187,22 @@ function Peer(options) {
         // NOTE - this is to limit bitrate via SDP
         // answer.sdp = sdputils.maybeSetAudioReceiveBitRate(answer.sdp, self.streamConfig);
         // answer.sdp = sdputils.maybeSetVideoReceiveBitRate(answer.sdp, self.streamConfig);
+        let sdp = answer.sdp;
+        if (self.videoCodec) {
+            sdp = preferCodec(sdp, 'video', self.videoCodec);
+        }
+        if (self.audioCodec) {
+            sdp = preferCodec(sdp, 'audio', self.audioCodec);
+        }
+
+        if (self.videoSDPBitrate) {
+            sdp = setBitrate(sdp, 'video', self.videoSDPBitrate);
+        }
+        if (self.audioSDPBitrate) {
+            sdp = setBitrate(sdp, 'video', self.videoSDPBitrate);
+        }
+
+        answer.sdp = sdp;
         self.send('answer', answer);
     });
     this.pc.on('addStream', this.handleRemoteStreamAdded.bind(this));
