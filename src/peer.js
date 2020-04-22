@@ -15,7 +15,7 @@ var FileTransfer = require('filetransfer');
 var INBAND_FILETRANSFER_V1 = 'https://simplewebrtc.com/protocol/filetransfer#inband-v1';
 
 function isAllTracksEnded(stream) {
-    var isAllTracksEnded = true;
+    let isAllTracksEnded = true;
     stream.getTracks().forEach(function (t) {
         isAllTracksEnded = t.readyState === 'ended' && isAllTracksEnded;
     });
@@ -30,7 +30,7 @@ function setDefaultCodec(mLine, id) {
     let elements = mLine.split(' ');
     let newLine = [];
     let index = 0;
-    for (var i = 0; i < elements.length; i++) {
+    for (let i = 0; i < elements.length; i++) {
         if (index === 3) {
             newLine[index++] = id;
         }
@@ -47,11 +47,17 @@ function setBitrate(sdp, mediaType, bitrate) {
     let mLineIndex = null;
     // find the m line matching our mediatype, so we can make sure
     // we're modifying the correct section
-    for (var i = 0; i < sdpLines.length; i++) {
+    for (let i = 0; i < sdpLines.length; i++) {
         if (sdpLines[i].search('m=' + mediaType) !== -1) {
             mLineIndex = i;
             break;
         }
+    }
+
+    if (mLineIndex === null) {
+        // if there's no m line, we've been given a broken SDP
+        // just abort and send it back
+        return sdp;
     }
 
     let index = mLineIndex + 1;
@@ -91,7 +97,7 @@ function preferCodec(sdp, mediaType, codec) {
     // keeping track of all of them, even if we only
     // use the first one for now
     let codexLineIndices = [];
-    for (var i = 0; i < sdpLines.length; i++) {
+    for (let i = 0; i < sdpLines.length; i++) {
         if (sdpLines[i].search('m=' + mediaType) !== -1) {
             mLineIndex = i;
         }
@@ -174,7 +180,6 @@ function Peer(options) {
             sdp = setBitrate(sdp, 'video', '1024');
         }
         offer.sdp = sdp;
-        console.log('offer sdp: ', offer.sdp);
         self.send('offer', offer);
     });
     this.pc.on('answer', function (answer) {
@@ -198,7 +203,6 @@ function Peer(options) {
         }
 
         answer.sdp = sdp;
-        console.log('answer sdp: ', answer.sdp);
         self.send('answer', answer);
     });
     this.pc.on('addStream', this.handleRemoteStreamAdded.bind(this));
