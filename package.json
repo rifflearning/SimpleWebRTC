@@ -1,38 +1,30 @@
 {
-  "name": "simplewebrtc",
-  "version": "3.0.2",
+  "name": "@rifflearning/simplewebrtc",
+  "version": "3.1.0",
+  "description": "World's easiest webrtc",
+  "license": "MIT",
+  "author": "Henrik Joreteg <hjoreteg@gmail.com>",
+  "contributors": [
+    "Philipp Hancke <fippo@appear.in>",
+    "Xander Dumaine <xander.dumaine@gmail.com>",
+    "Jordan Reedie <jordan@riffanalytics.ai>"
+  ],
+  "homepage": "https://github.com/rifflearning/SimpleWebRTC#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/andyet/SimpleWebRTC.git"
+    "url": "https://github.com/rifflearning/SimpleWebRTC.git"
+  },
+  "upstream": {
+    "type": "git",
+    "url": "https://github.com/simplewebrtc/SimpleWebRTC.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rifflearning/SimpleWebRTC/issues"
   },
   "main": "./src/simplewebrtc.js",
-  "description": "World's easiest webrtc",
-  "dependencies": {
-    "filetransfer": "^2.0.4",
-    "localmedia": "^4.0.0",
-    "rtcpeerconnection": "^8.0.0",
-    "webrtcsupport": "^2.2.0",
-    "wildemitter": "^1.2.0",
-    "socket.io-client": "^1.7.4",
-    "attachmediastream": "^2.0.0",
-    "mockconsole": "0.0.1"
-  },
-  "devDependencies": {
-    "browserify": "^13.1.0",
-    "precommit-hook": "^3.0.0",
-    "request": "^2.72.0",
-    "tape": "^4.0.0",
-    "testling": "^1.7.1",
-    "travis-multirunner": "^4.0.0",
-    "uglify-js": "^2.7.3",
-    "stupid-server": "^0.2.2",
-    "webrtc-adapter": "^6.0.0",
-    "webrtc-testbed": "git+https://github.com/fippo/testbed.git"
-  },
-  "peerDependencies": {
-    "webrtc-adapter": "^6.0.0"
-  },
-  "license": "MIT",
+  "files": [
+    "src/"
+  ],
   "scripts": {
     "build": "node build.js",
     "test-travis": "test/run-selenium",
@@ -46,5 +38,27 @@
     "lint",
     "validate"
   ],
-  "false": {}
+  "peerDependencies": {
+    "webrtc-adapter": "^6.4.8"
+  },
+  "dependencies": {
+    "@rifflearning/attachmediastream": "^3.0.0",
+    "@rifflearning/localmedia": "^6.0.0",
+    "filetransfer": "^2.0.4",
+    "mockconsole": "0.0.1",
+    "rtcpeerconnection": "^8.0.0",
+    "socket.io-client": "^2.3.0",
+    "webrtcsupport": "^2.2.0",
+    "wildemitter": "^1.2.1"
+  },
+  "devDependencies": {
+    "browserify": "^16.5.1",
+    "precommit-hook": "^3.0.0",
+    "stupid-server": "^0.2.2",
+    "tape": "^4.13.2",
+    "testling": "^1.7.3",
+    "travis-multirunner": "^4.6.0",
+    "webrtc-adapter": "^6.4.8",
+    "webrtc-testbed": "git+https://github.com/fippo/testbed.git"
+  }
 }

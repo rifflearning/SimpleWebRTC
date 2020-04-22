@@ -1,7 +1,5 @@
 const browserify = require('browserify');
 const fs = require('fs');
-const request = require('request');
-const uglify = require('uglify-js');
 
 const bundle = browserify({ standalone: 'SimpleWebRTC' });
 bundle.add('./src/simplewebrtc');

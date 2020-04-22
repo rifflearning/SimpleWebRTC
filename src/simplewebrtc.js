@@ -1,7 +1,7 @@
 var WebRTC = require('./webrtc');
 var WildEmitter = require('wildemitter');
 var webrtcSupport = require('webrtcsupport');
-var attachMediaStream = require('attachmediastream');
+var attachMediaStream = require('@rifflearning/attachmediastream');
 var mockconsole = require('mockconsole');
 var SocketIoConnection = require('./socketioconnection');
 
@@ -20,6 +20,7 @@ function SimpleWebRTC(opts) {
             autoRemoveVideos: true,
             adjustPeerVolume: false,
             peerVolumeWhenSpeaking: 0.25,
+            videoBitrateLimit: null,
             media: {
                 video: true,
                 audio: true
@@ -96,6 +97,11 @@ function SimpleWebRTC(opts) {
                     sid: message.sid,
                     type: message.roomType,
                     enableDataChannels: self.config.enableDataChannels && message.roomType !== 'screen',
+                    videoBitrateLimit: self.config.videoBitrateLimit,
+                    videoCodec: self.config.videoCodec,
+                    audioCodec: self.config.audioCodec,
+                    videoSDPBitrate: self.config.videoSDPBitrate,
+                    audioSDPBitrate: self.config.audioSDPBitrate,
                     sharemyscreen: message.roomType === 'screen' && !message.broadcaster,
                     broadcaster: message.roomType === 'screen' && !message.broadcaster ? self.connection.getSessionid() : null
                 });
@@ -195,17 +201,18 @@ function SimpleWebRTC(opts) {
 
     // screensharing events
     this.webrtc.on('localScreen', function (stream) {
-        var item,
-            el = document.createElement('video'),
-            container = self.getRemoteVideoContainer();
+        var el = document.createElement('video');
+        var container = self.getRemoteVideoContainer();
 
         el.oncontextmenu = function () { return false; };
-        el.id = 'localScreen';
+        el.id = 'sharedScreen';
         attachMediaStream(stream, el);
         if (container) {
             container.appendChild(el);
         }
+        el.muted = true;
 
+        // emits the video element ready to be added to the DOM
         self.emit('localScreenAdded', el);
         self.connection.emit('shareScreen');
 
@@ -217,6 +224,7 @@ function SimpleWebRTC(opts) {
                     type: 'screen',
                     sharemyscreen: true,
                     enableDataChannels: false,
+                    videoCodec: self.config.videoCodec,
                     receiveMedia: {
                         offerToReceiveAudio: 0,
                         offerToReceiveVideo: 0
@@ -229,22 +237,16 @@ function SimpleWebRTC(opts) {
         });
     });
     this.webrtc.on('localScreenStopped', function (stream) {
-        if (self.getLocalScreen()) {
-            self.stopScreenShare();
-        }
-        /*
-        self.connection.emit('unshareScreen');
-        self.webrtc.peers.forEach(function (peer) {
-            if (peer.sharemyscreen) {
-                peer.end();
-            }
-        });
-        */
+        self.stopScreenShare();
     });
 
     this.webrtc.on('channelMessage', function (peer, label, data) {
-        if (data.type == 'volume') {
+        if (data.type === 'volume') {
             self.emit('remoteVolumeChange', peer, data.volume);
+        } else if (data.type === 'urlShareStart') {
+            self.emit('urlShareStart', peer, data.payload);
+        } else if (data.type === 'urlShareStop') {
+            self.emit('urlShareStop', peer, data.payload);
         }
     });
 
@@ -288,7 +290,11 @@ SimpleWebRTC.prototype.handlePeerStreamAdded = function (peer) {
 
     if (container) container.appendChild(video);
 
-    this.emit('videoAdded', video, peer);
+    if (peer.type === 'video') {
+      this.emit('videoAdded', video, peer);
+    } else {
+      this.emit('screenAdded', video, peer);
+    }
 
     // send our mute status to new peer if we're muted
     // currently called with a small delay because it arrives before
@@ -310,7 +316,14 @@ SimpleWebRTC.prototype.handlePeerStreamRemoved = function (peer) {
     if (this.config.autoRemoveVideos && container && videoEl) {
         container.removeChild(videoEl);
     }
-    if (videoEl) this.emit('videoRemoved', videoEl, peer);
+
+    if (videoEl) {
+      if (peer.type === 'video' ) {
+        this.emit('videoRemoved', videoEl, peer);
+      } else {
+        this.emit('screenRemoved', videoEl, peer);
+      }
+    }
 };
 
 SimpleWebRTC.prototype.getDomId = function (peer) {
@@ -344,6 +357,11 @@ SimpleWebRTC.prototype.joinRoom = function (name, cb) {
                             id: id,
                             type: type,
                             enableDataChannels: self.config.enableDataChannels && type !== 'screen',
+                            videoBitrateLimit: self.config.videoBitrateLimit,
+                            videoCodec: self.config.videoCodec,
+                            audioCodec: self.config.audioCodec,
+                            videoSDPBitrate: self.config.videoSDPBitrate,
+                            audioSDPBitrate: self.config.audioSDPBitrate,
                             receiveMedia: {
                                 offerToReceiveAudio: type !== 'screen' && self.config.receiveMedia.offerToReceiveAudio ? 1 : 0,
                                 offerToReceiveVideo: self.config.receiveMedia.offerToReceiveVideo
@@ -378,6 +396,14 @@ SimpleWebRTC.prototype.startLocalVideo = function () {
             attachMediaStream(stream, self.getLocalVideoContainer(), self.config.localVideo);
         }
     });
+};
+
+SimpleWebRTC.prototype.reattachLocalVideo = function (videoEl) {
+    if (videoEl.srcObject == null && this.webrtc.localStreams.length === 1) {
+        attachMediaStream(this.webrtc.localStreams[0],
+                          videoEl,
+                          this.config.localVideo);
+    }
 };
 
 SimpleWebRTC.prototype.stopLocalVideo = function () {
@@ -416,17 +442,15 @@ SimpleWebRTC.prototype.getLocalScreen = function () {
 
 SimpleWebRTC.prototype.stopScreenShare = function () {
     this.connection.emit('unshareScreen');
-    var videoEl = document.getElementById('localScreen');
+    var videoEl = document.getElementById('sharedScreen');
     var container = this.getRemoteVideoContainer();
 
     if (this.config.autoRemoveVideos && container && videoEl) {
         container.removeChild(videoEl);
     }
 
-    // a hack to emit the event the removes the video
-    // element that we want
     if (videoEl) {
-        this.emit('videoRemoved', videoEl);
+        this.emit('localScreenRemoved', videoEl);
     }
     if (this.getLocalScreen()) {
         this.webrtc.stopScreenShare();
@@ -463,6 +487,13 @@ SimpleWebRTC.prototype.sendFile = function () {
         return this.emit('error', new Error('DataChannelNotSupported'));
     }
 
+};
+
+SimpleWebRTC.prototype.setVideoBitrateLimit = function (bitrateLimit) {
+    // this config is not used currently, but left in place for SDP modification
+    // should we decide to use it in the future
+    this.config.videoBitrateLimit = bitrateLimit;
+    this.webrtc.setVideoBitrateLimit(bitrateLimit);
 };
 
 module.exports = SimpleWebRTC;

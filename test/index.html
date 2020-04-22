@@ -31,6 +31,10 @@
             <input id="sessionInput"/>
             <button type="submit">Create it!</button>
         </form>
+        <form id="setBandwidth">
+            <input id="bandwidthLimit"/>
+            <button type="submit">Limit it!</button>
+        </form>
         <div class="videoContainer">
             <video id="localVideo" style="height: 150px;" oncontextmenu="return false;"></video>
             <div id="localVolume" class="volume_bar"></div>
@@ -50,14 +54,19 @@
                 remoteVideosEl: '',
                 // immediately ask for camera access
                 autoRequestMedia: true,
-                debug: false,
-                detectSpeakingEvents: true
+                videoBandwidthLimit: 1400,
+                debug: true,
+                detectSpeakingEvents: false
             });
 
+            var inRoom = false;
             // when it's ready, join if we got a room from the URL
             webrtc.on('readyToCall', function () {
                 // you can name it anything
-                if (room) webrtc.joinRoom(room);
+                if (room && !inRoom) {
+                    inRoom = true;
+                    webrtc.joinRoom(room);
+                }
             });
 
             function showVolume(el, volume) {
@@ -73,6 +82,23 @@
             webrtc.on('channelMessage', function (peer, label, data) {
                 if (data.type == 'volume') {
                     showVolume(document.getElementById('volume_' + peer.id), data.volume);
+                }
+            });
+            webrtc.on('localScreenAdded', function (video) {
+                console.log('screen added', video);
+                var remotes = document.getElementById('remotes');
+                if (remotes) {
+                    var d = document.createElement('div');
+                    d.className = 'videoContainer';
+                    d.id = 'container_sharing_' + webrtc.getDomId(video);
+                    d.appendChild(video);
+                    video.onclick = function () {
+                        video.style.width = video.videoWidth + 'px';
+                        video.style.height = video.videoHeight + 'px';
+                    };
+                    d.appendChild(video);
+                    remotes.appendChild(d);
+                    video.play()
                 }
             });
             webrtc.on('videoAdded', function (video, peer) {
@@ -109,7 +135,7 @@
 
             // Since we use this twice we put it here
             function setRoom(name) {
-                $('form').remove();
+                $('#createRoom').remove();
                 $('h1').text(name);
                 $('#subTitle').text('Link to join: ' + location.href);
                 $('body').addClass('active');
@@ -118,7 +144,7 @@
             if (room) {
                 setRoom(room);
             } else {
-                $('form').submit(function () {
+                $('#createRoom').submit(function () {
                     var val = $('#sessionInput').val().toLowerCase().replace(/\s/g, '-').replace(/[^A-Za-z0-9_\-]/g, '');
                     webrtc.createRoom(val, function (err, name) {
                         console.log(' create room cb', arguments);
@@ -139,11 +165,22 @@
                 setButton = function (bool) {
                     button.text(bool ? 'share screen' : 'stop sharing');
                 };
-            webrtc.on('localScreenStopped', function () {
+            webrtc.on('localScreenRemoved', function (video) {
                 setButton(true);
+                var remotes = document.getElementById('remotes');
+                var el = document.getElementById('container_sharing_' + webrtc.getDomId(video));
+                if (remotes && el) {
+                    remotes.removeChild(el);
+                }
+
             });
 
             setButton(true);
+            $('#setBandwidth').submit(function () {
+                var val = parseInt($('#bandwidthLimit').val().toLowerCase().replace(/\s/g, '-').replace(/[^A-Za-z0-9_\-]/g, ''));
+                webrtc.setVideoBandwidthLimit(val);
+                return false;
+            });
 
             button.click(function () {
                 if (webrtc.getLocalScreen()) {
@@ -160,6 +197,7 @@
 
                 }
             });
+
         </script>
     </body>
 </html>

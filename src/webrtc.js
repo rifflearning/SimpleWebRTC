@@ -1,7 +1,7 @@
 var util = require('util');
 var webrtcSupport = require('webrtcsupport');
 var mockconsole = require('mockconsole');
-var localMedia = require('localmedia');
+var localMedia = require('@rifflearning/localmedia');
 var Peer = require('./peer');
 
 function WebRTC(opts) {
@@ -150,6 +150,14 @@ WebRTC.prototype.sendDirectlyToAll = function (channel, message, payload) {
         if (peer.enableDataChannels) {
             peer.sendDirectly(channel, message, payload);
         }
+    });
+};
+
+WebRTC.prototype.setVideoBitrateLimit = function (bitrateLimit) {
+    // the sets the outgoing bitrate for each connection the client has made
+    // (excluding shared screens)
+    this.peers.forEach(function (peer) {
+        peer.setVideoBitrateLimit(bitrateLimit);
     });
 };
 
