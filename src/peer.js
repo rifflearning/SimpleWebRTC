@@ -208,11 +208,10 @@ function Peer(options) {
     this.pc.on('addStream', this.handleRemoteStreamAdded.bind(this));
     this.pc.on('addChannel', this.handleDataChannelAdded.bind(this));
     this.pc.on('removeStream', this.handleStreamRemoved.bind(this));
-    // Just fire negotiation needed events for now
-    // When browser re-negotiation handling seems to work
-    // we can use this as the trigger for starting the offer/answer process
-    // automatically. We'll just leave it be for now while this stabalizes.
-    this.pc.on('negotiationNeeded', this.emit.bind(this, 'negotiationNeeded'));
+    // re-initiate offer/answer process when renegotiation is required
+    this.pc.on('negotiationNeeded', function () {
+        self.start();
+    });
     this.pc.on('iceConnectionStateChange', this.emit.bind(this, 'iceConnectionStateChange'));
     this.pc.on('iceConnectionStateChange', function () {
         switch (self.pc.iceConnectionState) {
@@ -385,8 +384,11 @@ Peer.prototype.start = function () {
 };
 
 Peer.prototype.icerestart = function () {
-    var constraints = this.receiveMedia;
+    let constraints = this.receiveMedia;
+    // ironically, mandatory may or may not be specified in the constraints
+    constraints.mandatory = constraints.mandatory || {};
     constraints.mandatory.IceRestart = true;
+
     this.pc.offer(constraints, function (err, success) { });
 };
 
