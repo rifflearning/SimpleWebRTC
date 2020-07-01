@@ -387,6 +387,36 @@ SimpleWebRTC.prototype.getEl = function (idOrEl) {
     }
 };
 
+SimpleWebRTC.prototype.disableVideo = function () {
+    this.webrtc.getPeers(null, 'video').forEach((peer) => {
+        // simplewebrtc uses a very, very outdated wrapper for peer connections
+        // we need to access the underlying RTCPeerConnection to make this work
+        peer.pc.pc.getTransceivers().forEach((transceiver) => {
+            // each track (audio, video, potentially others) has an associated transceiver
+            // we have to iterate through the transceivers until we find the one
+            // specifically for video
+            if (transceiver.receiver.track.kind === 'video') {
+                // setting RTCRtpTransceiver.direction fires a
+                // negotiationneeded event, so we handle that elsewhere
+                // setting the direction to inactive disables both incoming
+                // and outgoing video streams
+                transceiver.direction = 'inactive';
+            }
+        });
+    });
+};
+
+SimpleWebRTC.prototype.enableVideo = function () {
+    // see comments in disableVideo function
+    this.webrtc.getPeers(null, 'video').forEach((peer) => {
+        peer.pc.pc.getTransceivers().forEach((transceiver) => {
+            if (transceiver.receiver.track.kind === 'video') {
+                transceiver.direction = 'sendrecv';
+            }
+        });
+    });
+};
+
 SimpleWebRTC.prototype.startLocalVideo = function () {
     var self = this;
     this.webrtc.start(this.config.media, function (err, stream) {
