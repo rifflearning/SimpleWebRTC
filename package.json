@@ -1,6 +1,6 @@
 {
   "name": "@rifflearning/simplewebrtc",
-  "version": "3.2.0",
+  "version": "3.3.0-dev.0",
   "description": "World's easiest webrtc",
   "license": "MIT",
   "author": "Henrik Joreteg <hjoreteg@gmail.com>",
